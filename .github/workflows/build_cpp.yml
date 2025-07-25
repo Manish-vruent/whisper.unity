@@ -14,6 +14,7 @@ on:
         description: 'Target platforms'
         required: true
         default: 'all'
+
 jobs:
   build-windows:
     name: Build for Windows (x86_64, Vulkan)
@@ -57,7 +58,7 @@ jobs:
           name: windows
           path: ${{ github.workspace }}/whisper-cpp/build/bin/Release
           if-no-files-found: error
-          
+
   build-linux:
     name: Build for Linux (x86_64, Vulkan)
     if: ${{ contains(fromJson('["linux", "all"]'), github.event.inputs.target_platform) }}
@@ -76,12 +77,9 @@ jobs:
           path: whisper-cpp
 
       - name: Dependencies
-        id: depends
         run: |
-          wget -qO - https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
-          sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list
           sudo apt-get update -y
-          sudo apt-get install -y build-essential mesa-vulkan-drivers vulkan-sdk libcurl4-openssl-dev
+          sudo apt-get install -y build-essential vulkan-sdk libcurl4-openssl-dev
           
       - name: Run build script
         run: |
@@ -94,7 +92,7 @@ jobs:
           name: linux
           path: ${{ github.workspace }}/whisper-unity/Packages/com.whisper.unity/Plugins/Linux/*.so
           if-no-files-found: error
-          
+
   build-macos:
     name: Build for MacOS Metal (ARM, x86_64)
     if: ${{ contains(fromJson('["macos", "all"]'), github.event.inputs.target_platform) }}
@@ -123,7 +121,7 @@ jobs:
           name: macos
           path: ${{ github.workspace }}/whisper-unity/Packages/com.whisper.unity/Plugins/MacOS/*.dylib
           if-no-files-found: error
-          
+
   build-ios:
     name: Build for iOS
     if: ${{ contains(fromJson('["ios", "all"]'), github.event.inputs.target_platform) }}
@@ -157,13 +155,13 @@ jobs:
     name: Build for Android (arm64-v8a)
     if: ${{ contains(fromJson('["android", "all"]'), github.event.inputs.target_platform) }}
     runs-on: ubuntu-latest
-    steps:          
+    steps:
       - name: Install Java
         uses: actions/setup-java@v3
         with:
           distribution: zulu
           java-version: 17
-      
+
       - name: Setup Android SDK
         uses: android-actions/setup-android@v2
 
@@ -172,27 +170,33 @@ jobs:
           sdkmanager --install "build-tools;33.0.2"
           sdkmanager --install "cmake;3.22.1"
           sdkmanager --install "ndk;25.1.8937393"
-          
+
       - name: Clone whisper.unity
         uses: actions/checkout@v3
         with:
           path: whisper-unity
-          
+
       - name: Clone whisper.cpp
         uses: actions/checkout@v3
         with:
           repository: ${{ github.event.inputs.whisper_cpp_repo }}
           ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
           path: whisper-cpp
-          
-      - name: Run build script
+
+      - name: Build Android .so
         run: |
-          cd whisper-unity
-          sh build_cpp.sh ${{ github.workspace }}/whisper-cpp/ android $ANDROID_HOME/ndk/25.1.8937393/build/cmake/android.toolchain.cmake
-          
+          mkdir -p build-android
+          cd build-android
+          cmake ../whisper-cpp \
+            -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/25.1.8937393/build/cmake/android.toolchain.cmake \
+            -DANDROID_ABI=arm64-v8a \
+            -DANDROID_PLATFORM=android-21 \
+            -DBUILD_SHARED_LIBS=ON
+          cmake --build . --config Release
+
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: android
-          path: ${{ github.workspace }}/whisper-unity/Packages/com.whisper.unity/Plugins/Android/*.a
+          path: build-android/libwhisper.so
           if-no-files-found: error
