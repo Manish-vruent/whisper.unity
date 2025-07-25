@@ -25,17 +25,17 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: whisper-unity
-          
+
       - name: Clone whisper.cpp
         uses: actions/checkout@v3
         with:
           repository: ${{ github.event.inputs.whisper_cpp_repo }}
           ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
           path: whisper-cpp
-          
+
       - name: Add msbuild to PATH
         uses: microsoft/setup-msbuild@v1
-        
+
       - name: Install Vulkan SDK
         uses: jakoch/install-vulkan-sdk-action@v1.0.4
         with:
@@ -51,46 +51,12 @@ jobs:
           .\build_cpp.bat ..\whisper-cpp\
           cd ${{ github.workspace }}\whisper-cpp\build\bin\Release
           ren whisper.dll libwhisper.dll
-          
+
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
           name: windows
           path: ${{ github.workspace }}/whisper-cpp/build/bin/Release
-          if-no-files-found: error
-
-  build-linux:
-    name: Build for Linux (x86_64, Vulkan)
-    if: ${{ contains(fromJson('["linux", "all"]'), github.event.inputs.target_platform) }}
-    runs-on: ubuntu-22.04
-    steps:
-      - name: Clone whisper.unity
-        uses: actions/checkout@v3
-        with:
-          path: whisper-unity
-          
-      - name: Clone whisper.cpp
-        uses: actions/checkout@v3
-        with:
-          repository: ${{ github.event.inputs.whisper_cpp_repo }}
-          ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
-          path: whisper-cpp
-
-      - name: Dependencies
-        run: |
-          sudo apt-get update -y
-          sudo apt-get install -y build-essential vulkan-sdk libcurl4-openssl-dev
-          
-      - name: Run build script
-        run: |
-          cd whisper-unity
-          sh build_cpp_linux.sh ${{ github.workspace }}/whisper-cpp
-          
-      - name: Upload results
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux
-          path: ${{ github.workspace }}/whisper-unity/Packages/com.whisper.unity/Plugins/Linux/*.so
           if-no-files-found: error
 
   build-macos:
@@ -102,19 +68,19 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: whisper-unity
-          
+
       - name: Clone whisper.cpp
         uses: actions/checkout@v3
         with:
           repository: ${{ github.event.inputs.whisper_cpp_repo }}
           ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
           path: whisper-cpp
-          
+
       - name: Run build script
         run: |
           cd whisper-unity
           sh build_cpp.sh ${{ github.workspace }}/whisper-cpp/ mac
-          
+
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
@@ -131,19 +97,19 @@ jobs:
         uses: actions/checkout@v3
         with:
           path: whisper-unity
-          
+
       - name: Clone whisper.cpp
         uses: actions/checkout@v3
         with:
           repository: ${{ github.event.inputs.whisper_cpp_repo }}
           ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
           path: whisper-cpp
-          
+
       - name: Run build script
         run: |
           cd whisper-unity
           sh build_cpp.sh ${{ github.workspace }}/whisper-cpp/ ios
-          
+
       - name: Upload results
         uses: actions/upload-artifact@v4
         with:
@@ -183,20 +149,28 @@ jobs:
           ref: ${{ github.event.inputs.whisper_cpp_repo_ref }}
           path: whisper-cpp
 
-      - name: Build Android .so
+      - name: Build libwhisper.so
         run: |
-          mkdir -p build-android
+          mkdir build-android
           cd build-android
           cmake ../whisper-cpp \
             -DCMAKE_TOOLCHAIN_FILE=$ANDROID_HOME/ndk/25.1.8937393/build/cmake/android.toolchain.cmake \
             -DANDROID_ABI=arm64-v8a \
             -DANDROID_PLATFORM=android-21 \
-            -DBUILD_SHARED_LIBS=ON
+            -DBUILD_SHARED_LIBS=ON \
+            -DCMAKE_BUILD_TYPE=Release
           cmake --build . --config Release
 
-      - name: Upload results
+      - name: Find libwhisper.so
+        id: find_so
+        run: |
+          find . -name "libwhisper.so" > so_path.txt
+          cat so_path.txt
+          echo "SO_PATH=$(cat so_path.txt)" >> $GITHUB_ENV
+
+      - name: Upload libwhisper.so
         uses: actions/upload-artifact@v4
         with:
           name: android
-          path: build-android/libwhisper.so
+          path: ${{ env.SO_PATH }}
           if-no-files-found: error
